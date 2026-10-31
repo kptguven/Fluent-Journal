@@ -15,6 +15,100 @@ function fj_mix( $hex1, $hex2, $ratio ) {
 	return $o;
 }
 
+/** #abc → #aabbcc */
+function fj_hex( $c ) {
+	$c = ltrim( (string) $c, '#' );
+	if ( 3 === strlen( $c ) ) {
+		$c = $c[0] . $c[0] . $c[1] . $c[1] . $c[2] . $c[2];
+	}
+	return '#' . strtolower( $c );
+}
+
+/** Özelleştirilebilir renkler: CSS değişkeni => Türkçe ad */
+function fj_color_fields() {
+	return array(
+		'bg'          => 'Sayfa arka planı',
+		'surface'     => 'Kutu / kart arka planı',
+		'surface-2'   => 'Hafif zemin (üzerine gelince, etiketler)',
+		'border'      => 'Kenarlık çizgileri',
+		'text'        => 'Yazı rengi',
+		'text-muted'  => 'Soluk yazı (tarih, yazar vb.)',
+		'brand'       => 'Buton rengi',
+		'brand-hover' => 'Buton üzerine gelince',
+		'on-brand'    => 'Buton yazı rengi',
+		'link'        => 'Bağlantı rengi',
+		'link-hover'  => 'Bağlantı üzerine gelince',
+		'brand-tint'  => 'Vurgulu rozet arka planı ("En yeni" vb.)',
+	);
+}
+
+function fj_color_setting_id( $mode, $var ) {
+	return 'fj_c_' . $mode . '_' . str_replace( '-', '_', $var );
+}
+
+/** Temel renklerden (ana vurgu + koyu renk) otomatik hesaplanan değerler. */
+function fj_palette_defaults( $mode ) {
+	$brand = fj_hex( sanitize_hex_color( get_theme_mod( 'fj_color_brand', '#8A6532' ) ) ?: '#8A6532' );
+	$navy  = fj_hex( sanitize_hex_color( get_theme_mod( 'fj_color_navy', '#091724' ) ) ?: '#091724' );
+	$white = '#ffffff';
+
+	if ( 'dark' === $mode ) {
+		return array(
+			'bg'          => $navy,
+			'surface'     => fj_mix( $navy, $white, 0.05 ),
+			'surface-2'   => fj_mix( $navy, $white, 0.1 ),
+			'border'      => fj_mix( $navy, $white, 0.17 ),
+			'text'        => fj_mix( $navy, $white, 0.93 ),
+			'text-muted'  => fj_mix( $navy, $white, 0.66 ),
+			'brand'       => $brand,
+			'brand-hover' => fj_mix( $brand, $white, 0.14 ),
+			'on-brand'    => '#ffffff',
+			'link'        => fj_mix( $brand, $white, 0.4 ),
+			'link-hover'  => fj_mix( $brand, $white, 0.6 ),
+			'brand-tint'  => fj_mix( $brand, $navy, 0.72 ),
+		);
+	}
+	return array(
+		'bg'          => fj_mix( $navy, $white, 0.96 ),
+		'surface'     => '#ffffff',
+		'surface-2'   => fj_mix( $navy, $white, 0.93 ),
+		'border'      => fj_mix( $navy, $white, 0.86 ),
+		'text'        => $navy,
+		'text-muted'  => fj_mix( $navy, $white, 0.36 ),
+		'brand'       => $brand,
+		'brand-hover' => fj_mix( $brand, '#000000', 0.12 ),
+		'on-brand'    => '#ffffff',
+		'link'        => $brand,
+		'link-hover'  => fj_mix( $brand, $navy, 0.35 ),
+		'brand-tint'  => fj_mix( $brand, $white, 0.9 ),
+	);
+}
+
+/** Otomatik değerler + kullanıcının tek tek seçtiği renkler. */
+function fj_palette( $mode ) {
+	$p = fj_palette_defaults( $mode );
+	foreach ( array_keys( fj_color_fields() ) as $var ) {
+		$v = sanitize_hex_color( get_theme_mod( fj_color_setting_id( $mode, $var ), '' ) );
+		if ( $v ) {
+			$p[ $var ] = fj_hex( $v );
+		}
+	}
+	$p['brand-pressed'] = ( 'dark' === $mode ) ? fj_mix( $p['brand'], '#ffffff', 0.06 ) : fj_mix( $p['brand'], '#000000', 0.24 );
+	return $p;
+}
+
+function fj_palette_css( $mode ) {
+	$css = 'color-scheme:' . $mode . ';';
+	foreach ( fj_palette( $mode ) as $k => $v ) {
+		$css .= '--' . $k . ':' . $v . ';';
+	}
+	$a = ( 'dark' === $mode ) ? array( '.24', '.28' ) : array( '.12', '.14' );
+	$css .= '--shadow-4:0 0 2px rgba(0,0,0,' . $a[0] . '),0 2px 4px rgba(0,0,0,' . $a[1] . ');'
+		. '--shadow-8:0 0 2px rgba(0,0,0,' . $a[0] . '),0 4px 8px rgba(0,0,0,' . $a[1] . ');'
+		. '--shadow-16:0 0 2px rgba(0,0,0,' . $a[0] . '),0 8px 16px rgba(0,0,0,' . $a[1] . ');';
+	return $css;
+}
+
 function fj_sanitize_mode( $v ) {
 	return in_array( $v, array( 'auto', 'light', 'dark' ), true ) ? $v : 'auto';
 }
@@ -52,10 +146,17 @@ function fj_customize_register( $wp_customize ) {
 		) );
 	}
 
-	/* Renkler ve görünüm */
+	/* Renkler paneli: temel renkler + açık tema + koyu tema */
+	$wp_customize->add_panel( 'fj_colors', array(
+		'title'       => 'Renkler ve Açık/Koyu Tema',
+		'priority'    => 31,
+		'description' => 'Önce "Temel Renkler"den iki ana rengi seçin; tema geri kalanını otomatik hesaplar. Sonra isterseniz Açık ve Koyu Tema bölümlerinden her rengi tek tek değiştirin.',
+	) );
+
 	$wp_customize->add_section( 'fj_look', array(
-		'title'    => 'Renkler ve Açık/Koyu Tema',
-		'priority' => 31,
+		'title'    => 'Temel Renkler ve Tema Modu',
+		'panel'    => 'fj_colors',
+		'priority' => 1,
 	) );
 
 	$wp_customize->add_setting( 'fj_color_brand', array( 'default' => '#8A6532', 'sanitize_callback' => 'sanitize_hex_color' ) );
@@ -83,6 +184,35 @@ function fj_customize_register( $wp_customize ) {
 			'dark'  => 'Her zaman koyu',
 		),
 	) );
+
+	/* Açık ve koyu tema: tek tek renkler */
+	$modes = array(
+		'light' => array( 'Açık Tema Renkleri', 2 ),
+		'dark'  => array( 'Koyu Tema Renkleri', 3 ),
+	);
+	foreach ( $modes as $mode => $info ) {
+		$section = 'fj_colors_' . $mode;
+		$wp_customize->add_section( $section, array(
+			'title'       => $info[0],
+			'panel'       => 'fj_colors',
+			'priority'    => $info[1],
+			'description' => 'Bir rengi değiştirmezseniz otomatik değeri kullanılır. Otomatik değere dönmek için rengin yanındaki "Temizle" düğmesine basın. Bu bölümü açınca önizleme otomatik olarak ' . ( 'dark' === $mode ? 'koyu' : 'açık' ) . ' temaya geçer.',
+		) );
+		$defaults = fj_palette_defaults( $mode );
+		foreach ( fj_color_fields() as $var => $label ) {
+			$id = fj_color_setting_id( $mode, $var );
+			$wp_customize->add_setting( $id, array(
+				'default'           => '',
+				'sanitize_callback' => 'sanitize_hex_color',
+				'transport'         => 'postMessage',
+			) );
+			$wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, $id, array(
+				'label'       => $label,
+				'description' => 'Otomatik: ' . strtoupper( $defaults[ $var ] ),
+				'section'     => $section,
+			) ) );
+		}
+	}
 
 	/* Genel */
 	$wp_customize->add_section( 'fj_general', array(
@@ -116,50 +246,13 @@ add_action( 'customize_register', 'fj_customize_register' );
 
 /* ---------- Dinamik CSS (renkler + yazı tipleri) ---------- */
 function fj_dynamic_css() {
-	$brand = sanitize_hex_color( get_theme_mod( 'fj_color_brand', '#8A6532' ) ) ?: '#8A6532';
-	$navy  = sanitize_hex_color( get_theme_mod( 'fj_color_navy', '#091724' ) ) ?: '#091724';
-	$white = '#ffffff';
-
 	$fonts = '--font-heading:' . fj_font_stack( get_theme_mod( 'fj_font_heading', 'system-sans' ) ) . ';'
 		. '--font-body:' . fj_font_stack( get_theme_mod( 'fj_font_body', 'system-sans' ) ) . ';'
 		. '--font-link:' . fj_font_stack( get_theme_mod( 'fj_font_link', 'inherit' ) ) . ';'
 		. '--font-button:' . fj_font_stack( get_theme_mod( 'fj_font_button', 'inherit' ) ) . ';';
 
-	$light = 'color-scheme:light;'
-		. '--bg:' . fj_mix( $navy, $white, 0.96 ) . ';'
-		. '--surface:#ffffff;'
-		. '--surface-2:' . fj_mix( $navy, $white, 0.93 ) . ';'
-		. '--border:' . fj_mix( $navy, $white, 0.86 ) . ';'
-		. '--text:' . $navy . ';'
-		. '--text-muted:' . fj_mix( $navy, $white, 0.36 ) . ';'
-		. '--brand:' . $brand . ';'
-		. '--brand-hover:' . fj_mix( $brand, '#000000', 0.12 ) . ';'
-		. '--brand-pressed:' . fj_mix( $brand, '#000000', 0.24 ) . ';'
-		. '--brand-tint:' . fj_mix( $brand, $white, 0.9 ) . ';'
-		. '--on-brand:#ffffff;'
-		. '--link:' . $brand . ';'
-		. '--link-hover:' . fj_mix( $brand, $navy, 0.35 ) . ';'
-		. '--shadow-4:0 0 2px rgba(0,0,0,.12),0 2px 4px rgba(0,0,0,.14);'
-		. '--shadow-8:0 0 2px rgba(0,0,0,.12),0 4px 8px rgba(0,0,0,.14);'
-		. '--shadow-16:0 0 2px rgba(0,0,0,.12),0 8px 16px rgba(0,0,0,.14);';
-
-	$dark = 'color-scheme:dark;'
-		. '--bg:' . $navy . ';'
-		. '--surface:' . fj_mix( $navy, $white, 0.05 ) . ';'
-		. '--surface-2:' . fj_mix( $navy, $white, 0.1 ) . ';'
-		. '--border:' . fj_mix( $navy, $white, 0.17 ) . ';'
-		. '--text:' . fj_mix( $navy, $white, 0.93 ) . ';'
-		. '--text-muted:' . fj_mix( $navy, $white, 0.66 ) . ';'
-		. '--brand:' . $brand . ';'
-		. '--brand-hover:' . fj_mix( $brand, $white, 0.14 ) . ';'
-		. '--brand-pressed:' . fj_mix( $brand, $white, 0.06 ) . ';'
-		. '--brand-tint:' . fj_mix( $brand, $navy, 0.72 ) . ';'
-		. '--on-brand:#ffffff;'
-		. '--link:' . fj_mix( $brand, $white, 0.4 ) . ';'
-		. '--link-hover:' . fj_mix( $brand, $white, 0.6 ) . ';'
-		. '--shadow-4:0 0 2px rgba(0,0,0,.24),0 2px 4px rgba(0,0,0,.28);'
-		. '--shadow-8:0 0 2px rgba(0,0,0,.24),0 4px 8px rgba(0,0,0,.28);'
-		. '--shadow-16:0 0 2px rgba(0,0,0,.24),0 8px 16px rgba(0,0,0,.28);';
+	$light = fj_palette_css( 'light' );
+	$dark  = fj_palette_css( 'dark' );
 
 	$css  = ':root{' . $fonts . $light . '}';
 	$css .= '@media (prefers-color-scheme:dark){:root:not([data-theme]){' . $dark . '}}';
@@ -167,6 +260,34 @@ function fj_dynamic_css() {
 	$css .= ':root[data-theme=light]{' . $light . '}';
 	return $css;
 }
+
+/* ---------- Canlı önizleme (Özelleştir ekranı) ---------- */
+function fj_customize_preview_js() {
+	$cfg = array();
+	foreach ( array( 'light', 'dark' ) as $mode ) {
+		foreach ( array_keys( fj_color_fields() ) as $var ) {
+			$cfg[] = array( 'id' => fj_color_setting_id( $mode, $var ), 'mode' => $mode, 'var' => $var );
+		}
+	}
+	wp_enqueue_script( 'fj-customizer-preview', get_template_directory_uri() . '/assets/js/customizer-preview.js', array( 'customize-preview' ), FJ_VERSION, true );
+	wp_localize_script( 'fj-customizer-preview', 'fjColorCfg', $cfg );
+}
+add_action( 'customize_preview_init', 'fj_customize_preview_js' );
+
+/** Koyu/açık renk bölümü açılınca önizlemeyi o temaya geçir. */
+function fj_customize_controls_js() {
+	wp_add_inline_script( 'customize-controls', "
+(function(api){
+	api.bind('ready',function(){
+		['light','dark'].forEach(function(m){
+			api.section('fj_colors_'+m,function(section){
+				section.expanded.bind(function(open){ if(open){ api.previewer.send('fj-mode',m); } });
+			});
+		});
+	});
+})(wp.customize);" );
+}
+add_action( 'customize_controls_enqueue_scripts', 'fj_customize_controls_js' );
 
 function fj_print_head_script() {
 	$mode = get_theme_mod( 'fj_default_mode', 'auto' );
