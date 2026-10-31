@@ -5,7 +5,7 @@
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="<?php echo esc_attr( get_theme_mod( 'fj_color_navy', '#091724' ) ); ?>" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="<?php $fj_dark = fj_palette( 'dark' ); echo esc_attr( $fj_dark['bg'] ); ?>" media="(prefers-color-scheme: dark)">
 <?php wp_head(); ?>
 </head>
 <body <?php body_class(); ?>>

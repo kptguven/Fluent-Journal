@@ -13,5 +13,8 @@ Kişisel blog teması. Fluent 2 tasarım dili, Fluent System Icons, açık/koyu 
 * Google Fonts yalnızca Özelleştir > Yazı Tipleri bölümünden bir "(Google)" yazı tipi seçilirse yüklenir.
 
 == Changelog ==
+= 1.1.0 =
+* Tüm renkler Özelleştir > Renkler panelinden açık ve koyu tema için ayrı ayrı değiştirilebilir (canlı önizleme ile).
+
 = 1.0.0 =
 * İlk sürüm.
